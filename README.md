@@ -28,7 +28,7 @@ All codes for the DCMADRL algorithm and related experiments are included.
 ## EnergyPlus–Python Co-Simulation Platform
 
 <p align="center">
-  <img src="figures/simulation_20260410165259_01.png" alt="EnergyPlus–Python co-simulation platform" width="500">
+  <img src="figures/simulation_20260410165259_01.png" alt="EnergyPlus–Python co-simulation platform" width="400">
 </p>
 
 This figure illustrates the integrated EnergyPlus–Python co-simulation platform used in this work.
