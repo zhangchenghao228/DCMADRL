@@ -20,5 +20,5 @@ All codes for the DCMADRL algorithm and related experiments are included.
 
 ## Notes
 
-- The experiments are conducted on an EnergyPlus–Python co-simulation platform.
-- EnergyPlus (v23.2) is required for running the simulation.
+- The EnergyPlus–Python co-simulation framework is integrated into this repository.
+- EnergyPlus (v23.2) is required to run the simulations.
