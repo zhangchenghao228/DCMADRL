@@ -6,8 +6,6 @@ This repository contains the implementation of the algorithm proposed in the pap
 
 All codes for the DCMADRL algorithm and related experiments are included.
 
-![EnergyPlus–Python co-simulation framework](figures/simulation_20260410165259_01.png)
-
 ---
 
 ## Environment
@@ -24,3 +22,11 @@ All codes for the DCMADRL algorithm and related experiments are included.
 
 - The EnergyPlus–Python co-simulation framework is integrated into this repository.
 - EnergyPlus (v23.2) is required to run the simulations.
+
+---
+
+## Framework
+
+<p align="center">
+  <img src="figures/simulation_20260410165259_01.png" alt="EnergyPlus–Python co-simulation framework" width="500">
+</p>
