@@ -8,7 +8,7 @@ Here are the param for the training
 def get_args():
     parser = argparse.ArgumentParser("Reinforcement Learning experiments for multiagent environments")
     # Environment
-    parser.add_argument("--scenario-name", type=str, default="simple_tag", help="name of the scenario script")
+    parser.add_argument("--scenario-name", type=str, default="simple_tag_distributional_cost_v1", help="name of the scenario script")
     parser.add_argument("--max-episode-len", type=int, default=96, help="maximum episode length")#这个是一个episode的步数
     parser.add_argument("--max-episode", type=int, default=300, help="number of episodes")#40
     # Core training parameters

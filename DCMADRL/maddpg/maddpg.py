@@ -300,18 +300,13 @@ class COST_CRITIC_NET:
         self.critic_loss2 = 0
 
 
+        self.num_quantiles = 32
         self.ipo_t = 10  # 内点惩罚参数
 
         self.critic_network1 = Cost_critic().to(device)
         self.critic_target_network1 = Cost_critic().to(device)
         self.critic_target_network1.load_state_dict(self.critic_network1.state_dict())
         self.critic_optim1 = torch.optim.Adam(self.critic_network1.parameters(), lr=self.args.lr_critic)
-
-        # self.critic_network2 = Cost_critic().to(device)
-        # self.critic_target_network2 = Cost_critic().to(device)
-        # self.critic_target_network2.load_state_dict(self.critic_network2.state_dict())
-        # self.critic_optim2 = torch.optim.Adam(self.critic_network2.parameters(), lr=self.args.lr_critic)
-
 
         # create the dict for store the model
         if not os.path.exists(self.args.save_dir):
@@ -328,51 +323,53 @@ class COST_CRITIC_NET:
     def _soft_update_target_network(self):
         for target_param, param in zip(self.critic_target_network1.parameters(), self.critic_network1.parameters()):
             target_param.data.copy_((1 - self.args.tau) * target_param.data + self.args.tau * param.data)
-        # for target_param, param in zip(self.critic_target_network2.parameters(), self.critic_network2.parameters()):
-        #     target_param.data.copy_((1 - self.args.tau) * target_param.data + self.args.tau * param.data)
 
+    def get_tau(self, reference):
+        """Use the same random interval/midpoint sampling as the reward IQN."""
+        weights = torch.rand(reference.shape[0], self.num_quantiles,
+                             device=reference.device, dtype=reference.dtype) + 0.1
+        weights = weights / weights.sum(dim=-1, keepdim=True)
+        edges = torch.cumsum(weights, dim=-1)
+        midpoints = edges - weights / 2
+        return midpoints, weights
 
-    def upda(self, o, u, o_next, u_next, r, logger):
+    @staticmethod
+    def quantile_regression_loss(prediction, target, tau, weights):
+        # Pair every predicted quantile with every target quantile.
+        residual = target.detach().unsqueeze(1) - prediction.unsqueeze(2)
+        abs_residual = residual.abs()
+        huber = torch.where(abs_residual <= 1, 0.5 * residual.square(),
+                            abs_residual - 0.5)
+        quantile_weight = (tau.detach().unsqueeze(2)
+                           - (residual.detach() < 0).to(prediction.dtype)).abs()
+        return (quantile_weight * huber * weights.detach().unsqueeze(1)).sum(-1).mean()
+
+    def upda(self, o, u, o_next, u_next, c, logger):
         with torch.no_grad():
-            # 使用目标网络预测下一个状态的 Q 值
-            q_next_1 = self.critic_target_network1(o_next, u_next).detach()
-            # q_next_2 = self.critic_target_network2(o_next, u_next).detach()
-            # next_value = torch.min(q_next_1, q_next_2)
-            target_q = (r.unsqueeze(1) + self.args.gamma * q_next_1).detach()
+            next_tau, next_weights = self.get_tau(o_next[0])
+            next_z = self.critic_target_network1(o_next, u_next, next_tau)
+            # Cost return has no reward-entropy term.
+            target_z = c.reshape(-1, 1) + self.args.gamma * next_z
 
-        # 计算当前 Q 网络的 Q 值
-        q_value1 = self.critic_network1(o, u)
-        # q_value2 = self.critic_network2(o, u)
-
-        # 计算两个 Q 网络的损失
-        critic_loss1 = torch.mean(F.mse_loss(q_value1, target_q))
-        # critic_loss2 = torch.mean(F.mse_loss(q_value2, target_q))
-
-        # 反向传播和优化
+        tau, _ = self.get_tau(o[0])
+        prediction = self.critic_network1(o, u, tau)
+        loss = self.quantile_regression_loss(prediction, target_z, tau, next_weights)
         self.critic_optim1.zero_grad()
-        critic_loss1.backward()
+        loss.backward()
         self.critic_optim1.step()
-
-        # self.critic_optim2.zero_grad()
-        # critic_loss2.backward()
-        # self.critic_optim2.step()
-
-        # 更新损失值
-        self.critic_loss1 = critic_loss1.item()
-        self.critic_loss2 = critic_loss1.item()
-
+        self.critic_loss1 = loss.item()
+        # Retain the legacy logging field; there is only one cost critic.
+        self.critic_loss2 = self.critic_loss1
         self._soft_update_target_network()
-
         self.train_step += 1
 
-    # def actor_loss(self, o, u):
-    #     q1_value = self.critic_network1(o, u)
-    #     # q2_value = self.critic_network2(o, u)
-    #     actor_loss = torch.mean(q1_value)#这个是正的cost
-    #     return actor_loss
-    
+    def expected_cost(self, o, u):
+        tau, weights = self.get_tau(o[0])
+        quantiles = self.critic_network1(o, u, tau)
+        return (weights * quantiles).sum(dim=-1, keepdim=True)
+
     def actor_loss(self, o, u, cost_limit):
-        q1_value = self.critic_network1(o, u).mean()
+        q1_value = self.expected_cost(o, u).mean()
 
         temp = F.relu(q1_value - cost_limit) - 1  #这个值是  
 
@@ -381,8 +378,6 @@ class COST_CRITIC_NET:
         else:  # 如果cost偏差大于0,则惩罚,超出约束范围进行策略惩罚，以引导策略恢复
             actor_loss = self.ipo_t * temp - math.log(1 / (self.ipo_t ** 2)) / self.ipo_t + 1 / self.ipo_t  # 添加一个小的常数以避免对数为零, 这个应该是负数
 
-        # q2_value = self.critic_network2(o, u)
-        # actor_loss = torch.mean(q1_value)#这个是正的cost
         return actor_loss
 
     def save_model(self, train_step):
