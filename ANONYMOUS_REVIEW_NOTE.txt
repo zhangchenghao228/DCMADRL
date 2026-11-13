@@ -1,0 +1,6 @@
+Anonymous review copy of the existing public code repository.
+Editor configuration, Python bytecode/cache and experiment-tracker logs were omitted.
+Workstation paths in four Python comments were removed.
+Excel author metadata was anonymized; worksheet data, formulas, styles and all other workbook parts were preserved byte-for-byte.
+This is an anonymized repository snapshot, not the separately prepared package for reproducing all current revised-manuscript figures.
+Training, simulation and statistical analyses were not rerun during this packaging step.
